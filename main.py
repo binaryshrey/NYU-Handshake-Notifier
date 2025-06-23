@@ -1,15 +1,12 @@
 import resend
 from slowapi import Limiter
 from datetime import datetime
-from configs import GRAPHQL_URL, REDIS_URL, RESEND_APIKEY, EMAILS_TO_NOTIFY
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import requests, logging, aioredis, json, pytz
 from fastapi import FastAPI, HTTPException, Request
 from utils import rate_limit_exceeded_handler, QUERY, HEADERS
-
-
-
+from configs import GRAPHQL_URL, REDIS_URL, RESEND_APIKEY, EMAILS_TO_NOTIFY, JOB_LINK
 
 # SETUP LOGGER
 logger = logging.getLogger(__file__)
@@ -74,8 +71,18 @@ def notify_via_email(new_jobs):
             job_data = job.get("node", {}).get("job", {})
 
             title = job_data.get("title", "N/A")
+            start_date = job_data.get("startDate")[:10] if job_data.get("startDate") else "N/A"
+            end_date = job_data.get("endDate")[:10] if job_data.get("endDate") else "N/A"
+            work_hours = job_data.get("workSchedule").get("hours", "N/A") if job_data.get("workSchedule") else "N/A"
+            work_interval = job_data.get("workSchedule").get("interval", "N/A").capitalize() if job_data.get("workSchedule") else "N/A"
+            job_id = job_data.get("id", "")
+            job_link = f"{JOB_LINK}/{job_id}"
+
             job_html_parts.append(
-                f"<p><strong>{idx}. {title}</strong><br>"
+                f"<p><strong>{idx}. <a href='{job_link}' target='_blank'>{title}</a></strong><br>"
+                f"Start Date: {start_date}<br>"
+                f"End Date: {end_date}<br>"
+                f"Duration: {work_hours} hrs/{work_interval}</p>"
             )
 
         job_html_content = "<h3>NYU New OnCampus Job(s) on Handshake:</h3>" + "".join(job_html_parts)
@@ -98,8 +105,37 @@ async def search_jobs():
             "first": 50,
             "after": "MA==",
             "input": {
-                "filter": {"query": "nyu"},
-                "sort": {"direction": "DESC", "field": "POST_DATE"}
+                "filter": {
+                    "jobTypeIds": ["9", "3", "6", "4", "5", "10", "7", "8"],
+                    "employmentTypeIds": ["2"],
+                    "locationRequirements": [
+                        {
+                            "point": "40.785306,-73.979956",
+                            "label": "New York, NY, New York 10024, United States",
+                            "type": "place",
+                            "distance": "50mi"
+                        },
+                        {
+                            "point": "42.751211,-75.465247",
+                            "label": "New York, United States",
+                            "type": "region",
+                            "distance": "50mi",
+                            "text": "New York"
+                        },
+                        {
+                            "point": "40.712749,-74.005994",
+                            "label": "New York City, New York, United States",
+                            "type": "place",
+                            "distance": "50mi",
+                            "text": "New York City"
+                        }
+                    ],
+                    "query": "nyu"
+                },
+                "sort": {
+                    "direction": "DESC",
+                    "field": "POST_DATE"
+                }
             }
         },
         "query": QUERY
@@ -122,7 +158,7 @@ async def search_jobs():
         await app.state.redis.expire("LAST_JOB_POSTING_CHECK", 24 * 60 * 60 * 50)
         if last_check_timing:
             for job in jobs:
-                if datetime.fromisoformat(job.get("node").get("job").get("createdAt")) > datetime.fromisoformat(last_check_timing):
+                if datetime.fromisoformat(job.get("node").get("job").get("createdAt")) >= datetime.fromisoformat(last_check_timing):
                     new_jobs.append(job)
         if new_jobs:
             params = notify_via_email(new_jobs)

@@ -31,7 +31,6 @@ python-multipart==0.0.20
 pytz==2025.2
 PyYAML==6.0.2
 requests==2.32.4
-resend==2.10.0
 rich==14.0.0
 rich-toolkit==0.14.7
 shellingham==1.5.4
@@ -47,3 +46,4 @@ uvloop==0.21.0
 watchfiles==1.1.0
 websockets==15.0.1
 wrapt==1.17.2
+resend~=2.10.0

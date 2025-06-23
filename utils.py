@@ -403,7 +403,6 @@ fragment JobSearchResultsList_JobSearchResultConnection on JobSearchResultConnec
 """
 
 
-
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """
     a simple JSON response that includes the details of the rate limit
