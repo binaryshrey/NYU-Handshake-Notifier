@@ -1,6 +1,6 @@
 import resend
 from slowapi import Limiter
-from datetime import datetime
+from datetime import datetime, timedelta
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import requests, logging, aioredis, json, pytz
@@ -35,22 +35,22 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 
 # On-Start
-@app.on_event("startup")
-async def startup_event():
-    # connect to Redis on startup
-    app.state.redis = await aioredis.create_redis_pool(f"{REDIS_URL}")
-    logger.info("Connected to Redis")
+# @app.on_event("startup")
+# async def startup_event():
+#     connect to Redis on startup
+#     app.state.redis = await aioredis.create_redis_pool(f"{REDIS_URL}")
+#     logger.info("Connected to Redis")
 
 
 
 
 # On-Destroy
-@app.on_event("shutdown")
-async def shutdown_event():
-    # disconnect from Redis on shutdown
-    app.state.redis.close()
-    await app.state.redis.wait_closed()
-    logger.info("Disconnected from Redis")
+# @app.on_event("shutdown")
+# async def shutdown_event():
+#     # disconnect from Redis on shutdown
+#     app.state.redis.close()
+#     await app.state.redis.wait_closed()
+#     logger.info("Disconnected from Redis")
 
 
 
@@ -85,12 +85,12 @@ def notify_via_email(new_jobs):
                 f"Duration: {work_hours} hrs/{work_interval}</p>"
             )
 
-        job_html_content = "<h3>NYU New OnCampus Job(s) on Handshake:</h3>" + "".join(job_html_parts)
+        job_html_content = "<h3>NYU on-campus job posting(s) in the past 12hours on Handshake:</h3>" + "".join(job_html_parts)
 
         params: resend.Emails.SendParams = {
             "from": "alerts@resend.dev",
             "to": EMAILS_TO_NOTIFY.split(';'),
-            "subject": "NYU Handshake New OnCampus Job(s) Alert!",
+            "subject": "NYU Handshake OnCampus Job Alerts!",
             "html": job_html_content,
         }
         return params
@@ -98,7 +98,6 @@ def notify_via_email(new_jobs):
 
 @app.post("/search-jobs")
 async def search_jobs():
-    new_jobs = []
     payload = {
         "operationName": "JobSearchQuery",
         "variables": {
@@ -141,31 +140,28 @@ async def search_jobs():
         "query": QUERY
     }
 
-
-    # check last job search timing in redis-cache
-    last_check_timing = ""
-    if await app.state.redis.exists("LAST_JOB_POSTING_CHECK"):
-        cached_data = await app.state.redis.get("LAST_JOB_POSTING_CHECK")
-        if cached_data is not None:
-            last_check_timing = json.loads(cached_data).get("last_check")
-        else:
-            logger.warning("no-last-check-timing")
+    new_jobs = []
+    twelve_hours_ago = datetime.now(ist) - timedelta(hours=12)
 
     try:
         res = requests.post(GRAPHQL_URL, json=payload, headers=HEADERS)
-        jobs = res.json().get("data").get("jobSearch").get("edges")
-        await app.state.redis.set("LAST_JOB_POSTING_CHECK", json.dumps({'last_check': datetime.now(ist).replace(microsecond=0).isoformat()}))
-        await app.state.redis.expire("LAST_JOB_POSTING_CHECK", 24 * 60 * 60 * 50)
-        if last_check_timing:
-            for job in jobs:
-                if datetime.fromisoformat(job.get("node").get("job").get("createdAt")) >= datetime.fromisoformat(last_check_timing):
+        jobs = res.json().get("data", {}).get("jobSearch", {}).get("edges", [])
+
+        for job in jobs:
+            job_created_at_str = job.get("node", {}).get("job", {}).get("createdAt")
+            if job_created_at_str:
+                job_created_at = datetime.fromisoformat(job_created_at_str)
+                if job_created_at >= twelve_hours_ago:
                     new_jobs.append(job)
+
         if new_jobs:
             params = notify_via_email(new_jobs)
             resend.Emails.send(params)
-            logger.info("Alert Send")
-            return {'message': 'emails notified for new jobs'}
+            logger.info("Alert sent for new jobs")
+            return {'message': f'emails notified for {len(new_jobs)} new jobs'}
         else:
-            return {'message': 'no new jobs'}
+            return {'message': 'no new jobs found in the last 12 hours'}
+
     except requests.RequestException as e:
+        logger.error(f"Request failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
