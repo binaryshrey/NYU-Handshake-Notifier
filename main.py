@@ -141,7 +141,7 @@ async def search_jobs():
     }
 
     new_jobs = []
-    twelve_hours_ago = datetime.now(ist) - timedelta(hours=12)
+    six_hours_ago = datetime.now(ist) - timedelta(hours=6)
 
     try:
         res = requests.post(GRAPHQL_URL, json=payload, headers=HEADERS)
@@ -151,7 +151,7 @@ async def search_jobs():
             job_created_at_str = job.get("node", {}).get("job", {}).get("createdAt")
             if job_created_at_str:
                 job_created_at = datetime.fromisoformat(job_created_at_str)
-                if job_created_at >= twelve_hours_ago:
+                if job_created_at >= six_hours_ago:
                     new_jobs.append(job)
 
         if new_jobs:
@@ -160,7 +160,7 @@ async def search_jobs():
             logger.info("Alert sent for new jobs")
             return {'message': f'emails notified for {len(new_jobs)} new jobs'}
         else:
-            return {'message': 'no new jobs found in the last 12 hours'}
+            return {'message': 'no new jobs found in the last 6 hours'}
 
     except requests.RequestException as e:
         logger.error(f"Request failed: {str(e)}")
