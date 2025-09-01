@@ -37,8 +37,8 @@ app.add_middleware(
 ist = pytz.timezone("Asia/Kolkata")
 resend.api_key = RESEND_APIKEY
 limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+#app.state.limiter = limiter
+#app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 
 
@@ -66,7 +66,7 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # health
 @app.get('/health')
-@limiter.limit("2/minute")
+#@limiter.limit("2/minute")
 async def check_alive(request: Request):
     return {'message': 'alive'}
 
