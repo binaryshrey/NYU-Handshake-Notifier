@@ -7,6 +7,8 @@ import requests, logging, aioredis, json, pytz
 from fastapi import FastAPI, HTTPException, Request
 from utils import rate_limit_exceeded_handler, QUERY, HEADERS
 from configs import GRAPHQL_URL, REDIS_URL, RESEND_APIKEY, EMAILS_TO_NOTIFY, JOB_LINK
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # SETUP LOGGER
 logger = logging.getLogger(__file__)
@@ -19,6 +21,13 @@ app = FastAPI(
     title='NYU Handshake Notifier v1',
     description='NYU Handshake Notifier v1',
     version='0.0.1',
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or restrict to your frontend domain(s)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
