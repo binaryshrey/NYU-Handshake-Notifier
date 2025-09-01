@@ -1,0 +1,6 @@
+.idea
+__pycache__
+apienv
+notifier
+.DS_Store
+.env
