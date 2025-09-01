@@ -115,6 +115,8 @@ def notify_via_email(new_jobs):
         return params
 
 
+
+
 @app.post("/search-jobs")
 async def search_jobs():
     payload = {
@@ -137,35 +139,20 @@ async def search_jobs():
         "query": QUERY
     }
 
-    new_jobs = []
-    six_hours_ago = datetime.now(ist) - timedelta(hours=60)
-
     try:
-        res = requests.post(GRAPHQL_URL, json=payload, headers=HEADERS)
+        logger.info(f"Making outbound request to {GRAPHQL_URL}")
+        res = requests.post(GRAPHQL_URL, json=payload, headers=HEADERS, timeout=10)
 
-        print(f"Status Code: {res.status_code}", flush=True)
-        print(f"Response Headers: {res.headers}", flush=True)
-        print(f"Response Text: {res.text[:500]}", flush=True)
+        logger.info(f"Outbound status code: {res.status_code}")
+        logger.info(f"Outbound headers: {res.headers}")
+        logger.info(f"Outbound text (first 500 chars): {res.text[:500]}")
 
-        print(res.json(), flush=True)
-        logging.info(res.json())
-        jobs = res.json().get("data", {}).get("jobSearch", {}).get("edges", [])
-
-        for job in jobs:
-            job_created_at_str = job.get("node", {}).get("job", {}).get("createdAt")
-            if job_created_at_str:
-                job_created_at = datetime.fromisoformat(job_created_at_str)
-                if job_created_at >= six_hours_ago:
-                    new_jobs.append(job)
-
-        if new_jobs:
-            params = notify_via_email(new_jobs)
-            resend.Emails.send(params)
-            logger.info("Alert sent for new jobs")
-            return {'message': f'emails notified for {len(new_jobs)} new jobs'}
-        else:
-            return {'message': 'no new jobs found in the last 6 hours'}
+        return {
+            "outbound_status": res.status_code,
+            "outbound_headers": dict(res.headers),
+            "outbound_body_snippet": res.text[:500]
+        }
 
     except requests.RequestException as e:
-        logger.error(f"Request failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.error(f"Outbound request failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Outbound request failed: {str(e)}")
