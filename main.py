@@ -134,11 +134,11 @@ async def search_jobs():
     try:
         res = requests.post(GRAPHQL_URL, json=payload, headers=HEADERS)
 
-        app.logger.info(f"Status Code: {res.status_code}")
-        app.logger.info(f"Response Headers: {res.headers}")
-        app.logger.info(f"Response Text: {res.text[:500]}")
+        print(f"Status Code: {res.status_code}", flush=True)
+        print(f"Response Headers: {res.headers}", flush=True)
+        print(f"Response Text: {res.text[:500]}", flush=True)
 
-        print(res.json())
+        print(res.json(), flush=True)
         logging.info(res.json())
         jobs = res.json().get("data", {}).get("jobSearch", {}).get("edges", [])
 
