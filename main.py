@@ -134,9 +134,9 @@ async def search_jobs():
     try:
         res = requests.post(GRAPHQL_URL, json=payload, headers=HEADERS)
 
-        logger.info(f"Status Code: {res.status_code}")
-        logger.info(f"Response Headers: {res.headers}")
-        logger.info(f"Response Text: {res.text[:500]}")
+        app.logger.info(f"Status Code: {res.status_code}")
+        app.logger.info(f"Response Headers: {res.headers}")
+        app.logger.info(f"Response Text: {res.text[:500]}")
 
         print(res.json())
         logging.info(res.json())
